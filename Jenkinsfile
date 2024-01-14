@@ -13,7 +13,7 @@ pipeline {
                 script {
                     skipDefaultCheckout()
                     git branch: 'develop', url: 'https://github.com/joejonenjonas/Team4-Pipeline1.git'
-                    sh 'git pull'
+                    sh 'git pull https://github.com/joejonenjonas/Team4-Pipeline1.git'
                     sh 'pwd'
                 }
             }
