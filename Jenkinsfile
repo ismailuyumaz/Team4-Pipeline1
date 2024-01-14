@@ -4,17 +4,19 @@ pipeline {
     stages {
         stage('Git Setup') {
             steps {
-                sh 'git init'
+                script {
+                    // Initialize Git repository
+                    sh 'git init'
+                }
             }
         }
 
         stage('Checkout develop') {
             steps {
                 script {
+                    // Skip default checkout and perform custom Git checkout
                     skipDefaultCheckout()
                     git branch: 'develop', url: 'https://github.com/joejonenjonas/Team4-Pipeline1.git'
-                    sh 'git pull'
-                    sh 'pwd'
                 }
             }
         }
@@ -22,54 +24,37 @@ pipeline {
         stage('Create Dockerfile') {
             steps {
                 script {
+                    // Define Dockerfile content
                     def dockerfileContent = """
-# Use the official Node.js image as the base image
 FROM node:14-alpine as base
-# Set the working directory inside the container
-WORKDIR /
-RUN ls -l
-# Copy package.json and package-lock.json to leverage Docker's caching
-COPY /var/lib/jenkins/workspace/Team4_Pipeline/package.json ./
+WORKDIR /app
+COPY package.json ./
 
 # Download dependencies
-RUN npm ci --omit=dev
+RUN npm ci --only=production
 
-# Create a stage for building
-FROM base as build
-
-# Copy the rest of the source files into the image
+# Copy source code
 COPY . .
 
 # Build the application
 RUN npm run build
 
-# Create the final stage
-FROM base as final
+# Create the final image
+FROM node:14-alpine
+WORKDIR /app
+COPY --from=base /app/dist ./dist
 
-# Set the environment to production
-ENV NODE_ENV production
-
-# Switch to the 'node' user
-USER node
-
-# Copy necessary files from the build stage
-COPY --from=build /usr/src/app/next.config.js .
+# Set environment variables if needed
 
 # Expose the port that the application listens on
 EXPOSE 4000
 
 # Run the application
-CMD npm run dev
+CMD ["npm", "start"]
+"""
 
-
-
-
-
-
-
-                        
-                    """
-                    writeFile(file: 'bussinbee/src/app/Dockerfile', text: dockerfileContent)
+                    // Write Dockerfile to the correct location
+                    writeFile(file: 'Dockerfile', text: dockerfileContent)
                 }
             }
         }
@@ -77,11 +62,10 @@ CMD npm run dev
         stage('Build and Run Node.js App in Docker') {
             steps {
                 script {
-                    // Assuming your Node.js app is in a directory named 'app'
                     dir('bussinbee/src/app') {
-                        // Build Docker image
+                        // Build Docker image and run container
                         sh 'docker build -t my-node-app .'
-                        sh 'docker run -p 4000:3000 -d --name karaoke my-node-app'
+                        sh 'docker run -p 4000:4000 -d --name my-node-app-container my-node-app'
                     }
                 }
             }
@@ -90,6 +74,7 @@ CMD npm run dev
         stage('Checkout test') {
             steps {
                 script {
+                    // Skip default checkout and perform custom Git checkout for the 'test' branch
                     skipDefaultCheckout()
                     git branch: 'test', url: 'https://github.com/joejonenjonas/Team4-Pipeline1.git'
                     sh 'git pull'
@@ -100,6 +85,7 @@ CMD npm run dev
         stage('Build and Test') {
             steps {
                 script {
+                    // Add your Maven build and test commands here
                     sh 'mvn verify -X'
                 }
             }
@@ -108,10 +94,12 @@ CMD npm run dev
         stage('Cleanup Docker Container') {
             steps {
                 script {
-                    sh 'docker stop karaoke || true'
-                    sh 'docker rm karaoke || true'
+                    // Stop and remove the Docker container
+                    sh 'docker stop my-node-app-container || true'
+                    sh 'docker rm my-node-app-container || true'
                 }
             }
         }
     }
 }
+
